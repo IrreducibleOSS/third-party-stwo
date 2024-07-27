@@ -2,7 +2,7 @@ mod prove;
 pub mod registry;
 
 use downcast_rs::{impl_downcast, Downcast};
-pub use prove::{commit_and_prove, commit_and_verify};
+pub use prove::{commit_and_prove, evaluate_and_commit_on_trace, commit_and_verify};
 use registry::ComponentGenerationRegistry;
 
 use crate::core::air::{AirProver, Component};

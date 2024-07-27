@@ -48,6 +48,7 @@ mod tests {
     use crate::m31;
     use crate::trace_generation::ComponentTraceGenerator;
     pub struct ComponentA {
+        #[allow(dead_code)]
         pub n_instances: usize,
     }
 

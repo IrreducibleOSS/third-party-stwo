@@ -62,7 +62,6 @@ pub type CpuMle<F> = Mle<CpuBackend, F>;
 mod tests {
     use itertools::Itertools;
     use rand::prelude::*;
-    use rand::rngs::SmallRng;
 
     use crate::core::backend::{Column, CpuBackend, FieldOps};
     use crate::core::fields::qm31::QM31;
