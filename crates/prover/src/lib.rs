@@ -1,18 +1,15 @@
 #![feature(
-    array_methods,
     array_chunks,
     iter_array_chunks,
     exact_size_is_empty,
     is_sorted,
     new_uninit,
-    slice_group_by,
-    stdsimd,
     get_many_mut,
     int_roundings,
-    slice_first_last_chunk,
     slice_flatten,
     assert_matches,
-    portable_simd
+    portable_simd,
+    stdarch_x86_avx512,
 )]
 pub mod constraint_framework;
 pub mod core;
