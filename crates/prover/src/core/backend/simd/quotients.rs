@@ -17,7 +17,7 @@ use crate::core::fields::FieldExpOps;
 use crate::core::pcs::quotients::{ColumnSampleBatch, QuotientOps};
 use crate::core::poly::circle::{CircleDomain, CircleEvaluation, PolyOps, SecureEvaluation};
 use crate::core::poly::BitReversedOrder;
-use crate::core::prover::LOG_BLOWUP_FACTOR;
+use crate::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
 use crate::core::utils::{bit_reverse, bit_reverse_index};
 
 pub struct QuotientConstants {
@@ -35,7 +35,7 @@ impl QuotientOps for SimdBackend {
     ) -> SecureEvaluation<Self> {
         // Split the domain into a subdomain and a shift coset.
         // TODO(spapini): Move to the caller when Columns support slices.
-        let (subdomain, mut subdomain_shifts) = domain.split(LOG_BLOWUP_FACTOR);
+        let (subdomain, mut subdomain_shifts) = domain.split(DEFAULT_LOG_BLOWUP_FACTOR);
 
         // Bit reverse the shifts.
         // Since we traverse the domain in bit-reversed order, we need bit-reverse the shifts.
@@ -257,14 +257,14 @@ mod tests {
     use crate::core::pcs::quotients::{ColumnSampleBatch, QuotientOps};
     use crate::core::poly::circle::{CanonicCoset, CircleEvaluation};
     use crate::core::poly::BitReversedOrder;
-    use crate::core::prover::LOG_BLOWUP_FACTOR;
+    use crate::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
     use crate::qm31;
 
     #[test]
     fn test_accumulate_quotients() {
         const LOG_SIZE: u32 = 8;
         let small_domain = CanonicCoset::new(LOG_SIZE).circle_domain();
-        let domain = CanonicCoset::new(LOG_SIZE + LOG_BLOWUP_FACTOR).circle_domain();
+        let domain = CanonicCoset::new(LOG_SIZE + DEFAULT_LOG_BLOWUP_FACTOR).circle_domain();
         let e0: BaseColumn = (0..small_domain.size()).map(BaseField::from).collect();
         let e1: BaseColumn = (0..small_domain.size())
             .map(|i| BaseField::from(2 * i))

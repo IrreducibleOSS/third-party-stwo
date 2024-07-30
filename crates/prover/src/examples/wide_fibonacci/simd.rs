@@ -287,9 +287,9 @@ mod tests {
         span.exit();
         let channel = &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[])));
         let air = SimdWideFibAir { component };
-        let proof = commit_and_prove::<SimdBackend>(&air, channel, trace).unwrap();
+        let proof = commit_and_prove::<SimdBackend>(&air, channel, trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap();
 
         let channel = &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[])));
-        commit_and_verify(proof, &air, channel).unwrap();
+        commit_and_verify(proof, &air, channel, DEFAULT_LOG_BLOWUP_FACTOR).unwrap();
     }
 }

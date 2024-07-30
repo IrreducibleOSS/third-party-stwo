@@ -12,7 +12,7 @@ use crate::core::poly::circle::{CanonicCoset, CircleEvaluation, MAX_CIRCLE_DOMAI
 use crate::core::poly::twiddles::TwiddleTree;
 use crate::core::poly::BitReversedOrder;
 use crate::core::prover::{
-    prove, verify, ProvingError, StarkProof, VerificationError, LOG_BLOWUP_FACTOR,
+    prove, verify, ProvingError, StarkProof, VerificationError, DEFAULT_LOG_BLOWUP_FACTOR,
 };
 use crate::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use crate::core::vcs::ops::MerkleOps;
@@ -25,10 +25,11 @@ pub fn commit_and_prove<B: Backend + MerkleOps<MerkleHasher>>(
     air: &impl AirTraceGenerator<B>,
     channel: &mut Channel,
     trace: ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>>,
+    log_blowup_factor: u32,
 ) -> Result<StarkProof, ProvingError> {
     // Check that traces are not too big.
     for (i, trace) in trace.iter().enumerate() {
-        if trace.domain.log_size() + LOG_BLOWUP_FACTOR > MAX_CIRCLE_DOMAIN_LOG_SIZE {
+        if trace.domain.log_size() + log_blowup_factor > MAX_CIRCLE_DOMAIN_LOG_SIZE {
             return Err(ProvingError::MaxTraceDegreeExceeded {
                 trace_index: i,
                 degree: trace.domain.log_size(),
@@ -39,7 +40,7 @@ pub fn commit_and_prove<B: Backend + MerkleOps<MerkleHasher>>(
     // Check that the composition polynomial is not too big.
     // TODO(AlonH): Get traces log degree bounds from trace writer.
     let composition_polynomial_log_degree_bound = air.composition_log_degree_bound();
-    if composition_polynomial_log_degree_bound + LOG_BLOWUP_FACTOR > MAX_CIRCLE_DOMAIN_LOG_SIZE {
+    if composition_polynomial_log_degree_bound + log_blowup_factor > MAX_CIRCLE_DOMAIN_LOG_SIZE {
         return Err(ProvingError::MaxCompositionDegreeExceeded {
             degree: composition_polynomial_log_degree_bound,
         });
@@ -48,14 +49,14 @@ pub fn commit_and_prove<B: Backend + MerkleOps<MerkleHasher>>(
     let span = span!(Level::INFO, "Precompute twiddle").entered();
     let composition_polynomial_log_degree_bound = air.composition_log_degree_bound();
     let twiddles = B::precompute_twiddles(
-        CanonicCoset::new(composition_polynomial_log_degree_bound + LOG_BLOWUP_FACTOR)
+        CanonicCoset::new(composition_polynomial_log_degree_bound + log_blowup_factor)
             .circle_domain()
             .half_coset,
     );
     span.exit();
 
     let (mut commitment_scheme, interaction_elements) =
-        evaluate_and_commit_on_trace(air, channel, &twiddles, trace)?;
+        evaluate_and_commit_on_trace(air, channel, &twiddles, trace, log_blowup_factor)?;
 
     let air = air.to_air_prover();
     channel.mix_felts(
@@ -66,7 +67,7 @@ pub fn commit_and_prove<B: Backend + MerkleOps<MerkleHasher>>(
             .collect_vec(),
     );
 
-    prove(&air, channel, &interaction_elements, &mut commitment_scheme)
+    prove(&air, channel, &interaction_elements, &mut commitment_scheme, log_blowup_factor)
 }
 
 pub fn evaluate_and_commit_on_trace<'a, B: Backend + MerkleOps<MerkleHasher>>(
@@ -74,8 +75,9 @@ pub fn evaluate_and_commit_on_trace<'a, B: Backend + MerkleOps<MerkleHasher>>(
     channel: &mut Channel,
     twiddles: &'a TwiddleTree<B>,
     trace: ColumnVec<CircleEvaluation<B, BaseField, BitReversedOrder>>,
+    log_blowup_factor: u32,
 ) -> Result<(CommitmentSchemeProver<'a, B>, InteractionElements), ProvingError> {
-    let mut commitment_scheme = CommitmentSchemeProver::new(LOG_BLOWUP_FACTOR, twiddles);
+    let mut commitment_scheme = CommitmentSchemeProver::new(log_blowup_factor, twiddles);
     // TODO(spapini): Remove clone.
     let span = span!(Level::INFO, "Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
@@ -101,6 +103,7 @@ pub fn commit_and_verify(
     proof: StarkProof,
     air: &(impl Air + AirTraceVerifier),
     channel: &mut Channel,
+    log_blowup_factor: u32,
 ) -> Result<(), VerificationError> {
     // Read trace commitment.
     let mut commitment_scheme = CommitmentSchemeVerifier::new();
@@ -112,7 +115,7 @@ pub fn commit_and_verify(
         proof.commitments[BASE_TRACE],
         &column_log_sizes[BASE_TRACE],
         channel,
-        LOG_BLOWUP_FACTOR,
+        log_blowup_factor,
     );
     let interaction_elements = air.interaction_elements(channel);
 
@@ -121,7 +124,7 @@ pub fn commit_and_verify(
             proof.commitments[INTERACTION_TRACE],
             &column_log_sizes[INTERACTION_TRACE],
             channel,
-            LOG_BLOWUP_FACTOR,
+            log_blowup_factor,
         );
     }
 
@@ -139,6 +142,7 @@ pub fn commit_and_verify(
         &interaction_elements,
         &mut commitment_scheme,
         proof,
+        log_blowup_factor,
     )
 }
 
@@ -159,7 +163,7 @@ mod tests {
         CanonicCoset, CircleDomain, CircleEvaluation, MAX_CIRCLE_DOMAIN_LOG_SIZE,
     };
     use crate::core::poly::BitReversedOrder;
-    use crate::core::prover::{ProvingError, VerificationError};
+    use crate::core::prover::{ProvingError, VerificationError, DEFAULT_LOG_BLOWUP_FACTOR};
     use crate::core::test_utils::test_channel;
     use crate::core::{ColumnVec, InteractionElements, LookupValues};
     use crate::qm31;
@@ -311,7 +315,7 @@ mod tests {
         let values = vec![BaseField::zero(); 1 << LOG_DOMAIN_SIZE];
         let trace = vec![CpuCircleEvaluation::new(domain, values)];
 
-        let proof_error = commit_and_prove(&air, &mut test_channel(), trace).unwrap_err();
+        let proof_error = commit_and_prove(&air, &mut test_channel(), trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap_err();
         assert!(matches!(
             proof_error,
             ProvingError::MaxTraceDegreeExceeded {
@@ -338,7 +342,7 @@ mod tests {
         let values = vec![BaseField::zero(); 1 << LOG_DOMAIN_SIZE];
         let trace = vec![CpuCircleEvaluation::new(domain, values)];
 
-        let proof_error = commit_and_prove(&air, &mut test_channel(), trace).unwrap_err();
+        let proof_error = commit_and_prove(&air, &mut test_channel(), trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap_err();
         assert!(matches!(
             proof_error,
             ProvingError::MaxCompositionDegreeExceeded {
@@ -360,7 +364,7 @@ mod tests {
         let values = vec![BaseField::zero(); 1 << LOG_DOMAIN_SIZE];
         let trace = vec![CpuCircleEvaluation::new(domain, values)];
 
-        let proof = commit_and_prove(&air, &mut test_channel(), trace).unwrap_err();
+        let proof = commit_and_prove(&air, &mut test_channel(), trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap_err();
         assert!(matches!(proof, ProvingError::ConstraintsNotSatisfied));
     }
 }

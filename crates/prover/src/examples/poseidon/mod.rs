@@ -468,7 +468,7 @@ mod tests {
     use crate::core::fields::IntoSlice;
     use crate::core::pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, TreeVec};
     use crate::core::poly::circle::{CanonicCoset, PolyOps};
-    use crate::core::prover::{prove, verify, LOG_BLOWUP_FACTOR};
+    use crate::core::prover::{prove, verify, DEFAULT_LOG_BLOWUP_FACTOR};
     use crate::core::vcs::blake2_hash::Blake2sHasher;
     use crate::core::vcs::hasher::Hasher;
     use crate::core::InteractionElements;
@@ -548,7 +548,7 @@ mod tests {
         // Precompute twiddles.
         let span = span!(Level::INFO, "Precompute twiddles").entered();
         let twiddles = SimdBackend::precompute_twiddles(
-            CanonicCoset::new(log_n_rows + LOG_EXPAND + LOG_BLOWUP_FACTOR)
+            CanonicCoset::new(log_n_rows + LOG_EXPAND + DEFAULT_LOG_BLOWUP_FACTOR)
                 .circle_domain()
                 .half_coset,
         );
@@ -556,7 +556,7 @@ mod tests {
 
         // Setup protocol.
         let channel = &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[])));
-        let commitment_scheme = &mut CommitmentSchemeProver::new(LOG_BLOWUP_FACTOR, &twiddles);
+        let commitment_scheme = &mut CommitmentSchemeProver::new(DEFAULT_LOG_BLOWUP_FACTOR, &twiddles);
 
         // Trace.
         let span = span!(Level::INFO, "Trace").entered();
@@ -581,6 +581,7 @@ mod tests {
             channel,
             &InteractionElements::default(),
             commitment_scheme,
+            DEFAULT_LOG_BLOWUP_FACTOR,
         )
         .unwrap();
 
@@ -592,9 +593,9 @@ mod tests {
         // Retrieve the expected column sizes in each commitment interaction, from the AIR.
         let sizes = air.column_log_sizes();
         // Trace columns.
-        commitment_scheme.commit(proof.commitments[0], &sizes[0], channel, LOG_BLOWUP_FACTOR);
+        commitment_scheme.commit(proof.commitments[0], &sizes[0], channel, DEFAULT_LOG_BLOWUP_FACTOR);
         // Constant columns.
-        commitment_scheme.commit(proof.commitments[1], &[log_n_rows], channel, LOG_BLOWUP_FACTOR);
+        commitment_scheme.commit(proof.commitments[1], &[log_n_rows], channel, DEFAULT_LOG_BLOWUP_FACTOR);
 
         verify(
             &air,
@@ -602,6 +603,7 @@ mod tests {
             &InteractionElements::default(),
             commitment_scheme,
             proof,
+            DEFAULT_LOG_BLOWUP_FACTOR,
         )
         .unwrap();
     }

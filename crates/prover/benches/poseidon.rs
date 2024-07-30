@@ -20,7 +20,7 @@ pub fn simd_poseidon(c: &mut Criterion) {
             let trace = gen_trace(component.log_column_size());
             let channel = &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[])));
             let air = PoseidonAir { component };
-            commit_and_prove::<SimdBackend>(&air, channel, trace).unwrap()
+            commit_and_prove::<SimdBackend>(&air, channel, trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap()
         });
     });
 }

@@ -29,7 +29,7 @@ type Channel = Blake2sChannel;
 type ChannelHasher = Blake2sHasher;
 type MerkleHasher = Blake2sMerkleHasher;
 
-pub const LOG_BLOWUP_FACTOR: u32 = 1;
+pub const DEFAULT_LOG_BLOWUP_FACTOR: u32 = 1;
 pub const LOG_LAST_LAYER_DEGREE_BOUND: u32 = 0;
 pub const PROOF_OF_WORK_BITS: u32 = 0;
 pub const N_QUERIES: usize = 3;
@@ -54,6 +54,7 @@ pub fn prove<B: Backend + MerkleOps<MerkleHasher>>(
     channel: &mut Channel,
     interaction_elements: &InteractionElements,
     commitment_scheme: &mut CommitmentSchemeProver<'_, B>,
+    log_blowup_factor: u32,
 ) -> Result<StarkProof, ProvingError> {
     let component_traces = air.component_traces(&commitment_scheme.trees);
     let lookup_values = air.lookup_values(&component_traces);
@@ -83,7 +84,7 @@ pub fn prove<B: Backend + MerkleOps<MerkleHasher>>(
     let sample_points = air.mask_points(oods_point);
 
     // Prove the trace and composition OODS values, and retrieve them.
-    let commitment_scheme_proof = commitment_scheme.prove_values(sample_points, channel, LOG_BLOWUP_FACTOR);
+    let commitment_scheme_proof = commitment_scheme.prove_values(sample_points, channel, log_blowup_factor);
 
     // Evaluate composition polynomial at OODS point and check that it matches the trace OODS
     // values. This is a sanity check.
@@ -116,6 +117,7 @@ pub fn verify(
     interaction_elements: &InteractionElements,
     commitment_scheme: &mut CommitmentSchemeVerifier,
     proof: StarkProof,
+    log_blowup_factor: u32,
 ) -> Result<(), VerificationError> {
     let random_coeff = channel.draw_felt();
 
@@ -124,7 +126,7 @@ pub fn verify(
         *proof.commitments.last().unwrap(),
         &[air.composition_log_degree_bound(); SECURE_EXTENSION_DEGREE],
         channel,
-        LOG_BLOWUP_FACTOR,
+        DEFAULT_LOG_BLOWUP_FACTOR,
     );
 
     // Draw OODS point.
@@ -155,7 +157,7 @@ pub fn verify(
     }
 
     air.verify_lookups(&proof.lookup_values)?;
-    commitment_scheme.verify_values(sample_points, proof.commitment_scheme_proof, channel, LOG_BLOWUP_FACTOR)
+    commitment_scheme.verify_values(sample_points, proof.commitment_scheme_proof, channel, log_blowup_factor)
 }
 
 #[allow(clippy::type_complexity)]
@@ -203,12 +205,12 @@ pub struct InvalidOodsSampleStructure;
 pub enum ProvingError {
     #[error(
         "Trace column {trace_index} log degree bound ({degree}) exceeded max log degree ({}).",
-        MAX_CIRCLE_DOMAIN_LOG_SIZE - LOG_BLOWUP_FACTOR
+        MAX_CIRCLE_DOMAIN_LOG_SIZE - DEFAULT_LOG_BLOWUP_FACTOR
     )]
     MaxTraceDegreeExceeded { trace_index: usize, degree: u32 },
     #[error(
         "Composition polynomial log degree bound ({degree}) exceeded max log degree ({}).",
-        MAX_CIRCLE_DOMAIN_LOG_SIZE - LOG_BLOWUP_FACTOR
+        MAX_CIRCLE_DOMAIN_LOG_SIZE - DEFAULT_LOG_BLOWUP_FACTOR
     )]
     MaxCompositionDegreeExceeded { degree: u32 },
     #[error("Constraints not satisfied.")]
