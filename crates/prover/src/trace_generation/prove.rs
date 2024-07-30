@@ -112,6 +112,7 @@ pub fn commit_and_verify(
         proof.commitments[BASE_TRACE],
         &column_log_sizes[BASE_TRACE],
         channel,
+        LOG_BLOWUP_FACTOR,
     );
     let interaction_elements = air.interaction_elements(channel);
 
@@ -120,6 +121,7 @@ pub fn commit_and_verify(
             proof.commitments[INTERACTION_TRACE],
             &column_log_sizes[INTERACTION_TRACE],
             channel,
+            LOG_BLOWUP_FACTOR,
         );
     }
 

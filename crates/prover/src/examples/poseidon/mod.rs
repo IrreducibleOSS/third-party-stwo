@@ -592,9 +592,9 @@ mod tests {
         // Retrieve the expected column sizes in each commitment interaction, from the AIR.
         let sizes = air.column_log_sizes();
         // Trace columns.
-        commitment_scheme.commit(proof.commitments[0], &sizes[0], channel);
+        commitment_scheme.commit(proof.commitments[0], &sizes[0], channel, LOG_BLOWUP_FACTOR);
         // Constant columns.
-        commitment_scheme.commit(proof.commitments[1], &[log_n_rows], channel);
+        commitment_scheme.commit(proof.commitments[1], &[log_n_rows], channel, LOG_BLOWUP_FACTOR);
 
         verify(
             &air,

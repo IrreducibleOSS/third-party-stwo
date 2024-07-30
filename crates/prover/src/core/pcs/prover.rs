@@ -13,7 +13,7 @@ use super::super::poly::circle::CanonicCoset;
 use super::super::poly::BitReversedOrder;
 use super::super::proof_of_work::{ProofOfWork, ProofOfWorkProof};
 use super::super::prover::{
-    LOG_BLOWUP_FACTOR, LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
+    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
 };
 use super::super::ColumnVec;
 use super::quotients::{compute_fri_quotients, PointSample};
@@ -82,6 +82,7 @@ impl<'a, B: Backend + MerkleOps<MerkleHasher>> CommitmentSchemeProver<'a, B> {
         &self,
         sampled_points: TreeVec<ColumnVec<Vec<CirclePoint<SecureField>>>>,
         channel: &mut ProofChannel,
+        log_blowup_factor: u32,
     ) -> CommitmentSchemeProof {
         // Evaluate polynomials on open points.
         let span = span!(Level::INFO, "Evaluate columns out of domain").entered();
@@ -108,7 +109,7 @@ impl<'a, B: Backend + MerkleOps<MerkleHasher>> CommitmentSchemeProver<'a, B> {
         let quotients = compute_fri_quotients(&columns, &samples.flatten(), channel.draw_felt());
 
         // Run FRI commitment phase on the oods quotients.
-        let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, LOG_BLOWUP_FACTOR, N_QUERIES);
+        let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, log_blowup_factor, N_QUERIES);
         let fri_prover =
             FriProver::<B, MerkleHasher>::commit(channel, fri_config, &quotients, self.twiddles);
 

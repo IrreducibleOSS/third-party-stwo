@@ -83,7 +83,7 @@ pub fn prove<B: Backend + MerkleOps<MerkleHasher>>(
     let sample_points = air.mask_points(oods_point);
 
     // Prove the trace and composition OODS values, and retrieve them.
-    let commitment_scheme_proof = commitment_scheme.prove_values(sample_points, channel);
+    let commitment_scheme_proof = commitment_scheme.prove_values(sample_points, channel, LOG_BLOWUP_FACTOR);
 
     // Evaluate composition polynomial at OODS point and check that it matches the trace OODS
     // values. This is a sanity check.
@@ -124,6 +124,7 @@ pub fn verify(
         *proof.commitments.last().unwrap(),
         &[air.composition_log_degree_bound(); SECURE_EXTENSION_DEGREE],
         channel,
+        LOG_BLOWUP_FACTOR,
     );
 
     // Draw OODS point.
@@ -154,7 +155,7 @@ pub fn verify(
     }
 
     air.verify_lookups(&proof.lookup_values)?;
-    commitment_scheme.verify_values(sample_points, proof.commitment_scheme_proof, channel)
+    commitment_scheme.verify_values(sample_points, proof.commitment_scheme_proof, channel, LOG_BLOWUP_FACTOR)
 }
 
 #[allow(clippy::type_complexity)]

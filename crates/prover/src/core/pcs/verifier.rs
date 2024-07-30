@@ -8,7 +8,7 @@ use super::super::fields::qm31::SecureField;
 use super::super::fri::{CirclePolyDegreeBound, FriConfig, FriVerifier};
 use super::super::proof_of_work::ProofOfWork;
 use super::super::prover::{
-    LOG_BLOWUP_FACTOR, LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
+    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
 };
 use super::quotients::{fri_answers, PointSample};
 use super::utils::TreeVec;
@@ -46,11 +46,12 @@ impl CommitmentSchemeVerifier {
         commitment: Blake2sHash,
         log_sizes: &[u32],
         channel: &mut ProofChannel,
+        log_blowup_factor: u32,
     ) {
         channel.mix_digest(commitment);
         let extended_log_sizes = log_sizes
             .iter()
-            .map(|&log_size| log_size + LOG_BLOWUP_FACTOR)
+            .map(|&log_size| log_size + log_blowup_factor)
             .collect();
         let verifier = MerkleVerifier::new(commitment, extended_log_sizes);
         self.trees.push(verifier);
@@ -61,6 +62,7 @@ impl CommitmentSchemeVerifier {
         sampled_points: TreeVec<ColumnVec<Vec<CirclePoint<SecureField>>>>,
         proof: CommitmentSchemeProof,
         channel: &mut ProofChannel,
+        log_blowup_factor: u32,
     ) -> Result<(), VerificationError> {
         channel.mix_felts(&proof.sampled_values.clone().flatten_cols());
         let random_coeff = channel.draw_felt();
@@ -69,7 +71,7 @@ impl CommitmentSchemeVerifier {
             .column_log_sizes()
             .zip_cols(&sampled_points)
             .map_cols(|(log_size, sampled_points)| {
-                vec![CirclePolyDegreeBound::new(log_size - LOG_BLOWUP_FACTOR); sampled_points.len()]
+                vec![CirclePolyDegreeBound::new(log_size - log_blowup_factor); sampled_points.len()]
             })
             .flatten_cols()
             .into_iter()
@@ -79,7 +81,7 @@ impl CommitmentSchemeVerifier {
             .collect_vec();
 
         // FRI commitment phase on OODS quotients.
-        let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, LOG_BLOWUP_FACTOR, N_QUERIES);
+        let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, log_blowup_factor, N_QUERIES);
         let mut fri_verifier = FriVerifier::commit(channel, fri_config, proof.fri_proof, bounds)?;
 
         // Verify proof of work.
