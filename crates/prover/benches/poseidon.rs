@@ -3,6 +3,7 @@ use stwo_prover::core::backend::simd::SimdBackend;
 use stwo_prover::core::channel::{Blake2sChannel, Channel};
 use stwo_prover::core::fields::m31::BaseField;
 use stwo_prover::core::fields::IntoSlice;
+use stwo_prover::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
 use stwo_prover::core::vcs::blake2_hash::Blake2sHasher;
 use stwo_prover::core::vcs::hasher::Hasher;
 use stwo_prover::examples::poseidon::{gen_trace, PoseidonAir, PoseidonComponent};

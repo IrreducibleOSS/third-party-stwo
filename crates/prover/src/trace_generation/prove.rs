@@ -12,7 +12,7 @@ use crate::core::poly::circle::{CanonicCoset, CircleEvaluation, MAX_CIRCLE_DOMAI
 use crate::core::poly::twiddles::TwiddleTree;
 use crate::core::poly::BitReversedOrder;
 use crate::core::prover::{
-    prove, verify, ProvingError, StarkProof, VerificationError, DEFAULT_LOG_BLOWUP_FACTOR,
+    prove, verify, ProvingError, StarkProof, VerificationError,
 };
 use crate::core::vcs::blake2_merkle::Blake2sMerkleHasher;
 use crate::core::vcs::ops::MerkleOps;

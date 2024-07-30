@@ -22,6 +22,7 @@ mod tests {
     use crate::core::fields::IntoSlice;
     use crate::core::pcs::TreeVec;
     use crate::core::poly::circle::CanonicCoset;
+    use crate::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
     use crate::core::utils::{
         bit_reverse, circle_domain_order_to_coset_order, shifted_secure_combination,
     };
@@ -234,10 +235,10 @@ mod tests {
         let air = WideFibAir { component };
         let prover_channel =
             &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[])));
-        let proof = commit_and_prove::<CpuBackend>(&air, prover_channel, trace).unwrap();
+        let proof = commit_and_prove::<CpuBackend>(&air, prover_channel, trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap();
 
         let verifier_channel =
             &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[])));
-        commit_and_verify(proof, &air, verifier_channel).unwrap();
+        commit_and_verify(proof, &air, verifier_channel, DEFAULT_LOG_BLOWUP_FACTOR).unwrap();
     }
 }

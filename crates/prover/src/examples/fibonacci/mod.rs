@@ -10,7 +10,7 @@ use crate::core::fields::m31::BaseField;
 use crate::core::fields::{FieldExpOps, IntoSlice};
 use crate::core::poly::circle::{CanonicCoset, CircleEvaluation};
 use crate::core::poly::BitReversedOrder;
-use crate::core::prover::{ProvingError, StarkProof, VerificationError};
+use crate::core::prover::{ProvingError, StarkProof, VerificationError, DEFAULT_LOG_BLOWUP_FACTOR};
 use crate::core::vcs::blake2_hash::Blake2sHasher;
 use crate::core::vcs::hasher::Hasher;
 use crate::trace_generation::{commit_and_prove, commit_and_verify};
@@ -56,7 +56,7 @@ impl Fibonacci {
             .air
             .component
             .claim])));
-        commit_and_prove(&self.air, channel, vec![trace])
+        commit_and_prove(&self.air, channel, vec![trace], DEFAULT_LOG_BLOWUP_FACTOR)
     }
 
     pub fn verify(&self, proof: StarkProof) -> Result<(), VerificationError> {
@@ -64,7 +64,7 @@ impl Fibonacci {
             .air
             .component
             .claim])));
-        commit_and_verify(proof, &self.air, channel)
+        commit_and_verify(proof, &self.air, channel, DEFAULT_LOG_BLOWUP_FACTOR)
     }
 }
 
@@ -99,13 +99,13 @@ impl MultiFibonacci {
         let channel =
             &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&self.claims)));
         let trace = self.get_trace();
-        commit_and_prove(&self.air, channel, trace)
+        commit_and_prove(&self.air, channel, trace, DEFAULT_LOG_BLOWUP_FACTOR)
     }
 
     pub fn verify(&self, proof: StarkProof) -> Result<(), VerificationError> {
         let channel =
             &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&self.claims)));
-        commit_and_verify(proof, &self.air, channel)
+        commit_and_verify(proof, &self.air, channel, DEFAULT_LOG_BLOWUP_FACTOR)
     }
 }
 
@@ -129,7 +129,7 @@ mod tests {
     use crate::core::fields::IntoSlice;
     use crate::core::pcs::TreeVec;
     use crate::core::poly::circle::CanonicCoset;
-    use crate::core::prover::VerificationError;
+    use crate::core::prover::{VerificationError, DEFAULT_LOG_BLOWUP_FACTOR};
     use crate::core::queries::Queries;
     use crate::core::utils::bit_reverse;
     use crate::core::vcs::blake2_hash::Blake2sHasher;
@@ -255,12 +255,12 @@ mod tests {
         let trace = fib_trace_generator.write_trace();
         let channel =
             &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[CLAIM])));
-        let proof = commit_and_prove(&fib_trace_generator, channel, trace).unwrap();
+        let proof = commit_and_prove(&fib_trace_generator, channel, trace, DEFAULT_LOG_BLOWUP_FACTOR).unwrap();
 
         let channel =
             &mut Blake2sChannel::new(Blake2sHasher::hash(BaseField::into_slice(&[CLAIM])));
         let fib_air = Fibonacci::new(FIB_LOG_SIZE, CLAIM).air;
-        commit_and_verify(proof, &fib_air, channel).unwrap();
+        commit_and_verify(proof, &fib_air, channel, DEFAULT_LOG_BLOWUP_FACTOR).unwrap();
     }
 
     #[test]

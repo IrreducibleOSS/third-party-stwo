@@ -263,6 +263,7 @@ mod tests {
     use crate::core::channel::{Blake2sChannel, Channel};
     use crate::core::fields::m31::BaseField;
     use crate::core::fields::IntoSlice;
+    use crate::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
     use crate::core::vcs::blake2_hash::Blake2sHasher;
     use crate::core::vcs::hasher::Hasher;
     use crate::examples::wide_fibonacci::component::LOG_N_COLUMNS;
