@@ -281,7 +281,7 @@ mod tests {
         const LOG_SIZE: u32 = 8;
         const LOG_BLOWUP_FACTOR: u32 = 1;
         let small_domain = CanonicCoset::new(LOG_SIZE).circle_domain();
-        let domain = CanonicCoset::new(LOG_SIZE + DEFAULT_LOG_BLOWUP_FACTOR).circle_domain();
+        let domain = CanonicCoset::new(LOG_SIZE + LOG_BLOWUP_FACTOR).circle_domain();
         let e0: BaseColumn = (0..small_domain.size()).map(BaseField::from).collect();
         let e1: BaseColumn = (0..small_domain.size())
             .map(|i| BaseField::from(2 * i))

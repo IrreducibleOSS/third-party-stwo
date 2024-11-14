@@ -58,7 +58,7 @@ pub fn prove<B: BackendForChannel<MC>, MC: MerkleChannel>(
     sample_points.push(vec![vec![oods_point]; SECURE_EXTENSION_DEGREE]);
 
     // Prove the trace and composition OODS values, and retrieve them.
-    let commitment_scheme_proof = commitment_scheme.prove_values(sample_points, channel, log_blowup_factor);
+    let commitment_scheme_proof = commitment_scheme.prove_values(sample_points, channel);
 
     let sampled_oods_values = &commitment_scheme_proof.sampled_values;
     let composition_oods_eval = extract_composition_eval(sampled_oods_values).unwrap();
@@ -95,7 +95,6 @@ pub fn verify<MC: MerkleChannel>(
         *proof.commitments.last().unwrap(),
         &[components.composition_log_degree_bound(); SECURE_EXTENSION_DEGREE],
         channel,
-        DEFAULT_LOG_BLOWUP_FACTOR,
     );
 
     // Draw OODS point.
