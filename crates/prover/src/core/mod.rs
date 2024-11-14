@@ -16,6 +16,7 @@ pub mod prover;
 pub mod queries;
 #[cfg(test)]
 pub mod test_utils;
+pub mod tracing;
 pub mod utils;
 pub mod vcs;
 
