@@ -2,35 +2,31 @@ use std::iter::zip;
 
 use itertools::Itertools;
 
-use super::super::channel::Blake2sChannel;
 use super::super::circle::CirclePoint;
 use super::super::fields::qm31::SecureField;
-use super::super::fri::{CirclePolyDegreeBound, FriConfig, FriVerifier};
-use super::super::proof_of_work::ProofOfWork;
-use super::super::prover::{
-    LOG_LAST_LAYER_DEGREE_BOUND, N_QUERIES, PROOF_OF_WORK_BITS,
-};
+use super::super::fri::{CirclePolyDegreeBound, FriVerifier};
 use super::quotients::{fri_answers, PointSample};
 use super::utils::TreeVec;
-use super::CommitmentSchemeProof;
-use crate::core::channel::Channel;
+use super::{CommitmentSchemeProof, PcsConfig};
+use crate::core::channel::{Channel, MerkleChannel};
 use crate::core::prover::VerificationError;
-use crate::core::vcs::blake2_hash::Blake2sHash;
-use crate::core::vcs::blake2_merkle::Blake2sMerkleHasher;
+use crate::core::vcs::ops::MerkleHasher;
 use crate::core::vcs::verifier::MerkleVerifier;
 use crate::core::ColumnVec;
 
-type ProofChannel = Blake2sChannel;
-
 /// The verifier side of a FRI polynomial commitment scheme. See [super].
 #[derive(Default)]
-pub struct CommitmentSchemeVerifier {
-    pub trees: TreeVec<MerkleVerifier<Blake2sMerkleHasher>>,
+pub struct CommitmentSchemeVerifier<MC: MerkleChannel> {
+    pub trees: TreeVec<MerkleVerifier<MC::H>>,
+    pub config: PcsConfig,
 }
 
-impl CommitmentSchemeVerifier {
-    pub fn new() -> Self {
-        Self::default()
+impl<MC: MerkleChannel> CommitmentSchemeVerifier<MC> {
+    pub fn new(config: PcsConfig) -> Self {
+        Self {
+            trees: TreeVec::default(),
+            config,
+        }
     }
 
     /// A [TreeVec<ColumnVec>] of the log sizes of each column in each commitment tree.
@@ -43,15 +39,14 @@ impl CommitmentSchemeVerifier {
     /// Reads a commitment from the prover.
     pub fn commit(
         &mut self,
-        commitment: Blake2sHash,
+        commitment: <MC::H as MerkleHasher>::Hash,
         log_sizes: &[u32],
-        channel: &mut ProofChannel,
-        log_blowup_factor: u32,
+        channel: &mut MC::C,
     ) {
-        channel.mix_digest(commitment);
+        MC::mix_root(channel, commitment);
         let extended_log_sizes = log_sizes
             .iter()
-            .map(|&log_size| log_size + log_blowup_factor)
+            .map(|&log_size| log_size + self.config.fri_config.log_blowup_factor)
             .collect();
         let verifier = MerkleVerifier::new(commitment, extended_log_sizes);
         self.trees.push(verifier);
@@ -60,9 +55,8 @@ impl CommitmentSchemeVerifier {
     pub fn verify_values(
         &self,
         sampled_points: TreeVec<ColumnVec<Vec<CirclePoint<SecureField>>>>,
-        proof: CommitmentSchemeProof,
-        channel: &mut ProofChannel,
-        log_blowup_factor: u32,
+        proof: CommitmentSchemeProof<MC::H>,
+        channel: &mut MC::C,
     ) -> Result<(), VerificationError> {
         channel.mix_felts(&proof.sampled_values.clone().flatten_cols());
         let random_coeff = channel.draw_felt();
@@ -71,7 +65,10 @@ impl CommitmentSchemeVerifier {
             .column_log_sizes()
             .zip_cols(&sampled_points)
             .map_cols(|(log_size, sampled_points)| {
-                vec![CirclePolyDegreeBound::new(log_size - log_blowup_factor); sampled_points.len()]
+                vec![
+                    CirclePolyDegreeBound::new(log_size - self.config.fri_config.log_blowup_factor);
+                    sampled_points.len()
+                ]
             })
             .flatten_cols()
             .into_iter()
@@ -81,11 +78,14 @@ impl CommitmentSchemeVerifier {
             .collect_vec();
 
         // FRI commitment phase on OODS quotients.
-        let fri_config = FriConfig::new(LOG_LAST_LAYER_DEGREE_BOUND, log_blowup_factor, N_QUERIES);
-        let mut fri_verifier = FriVerifier::commit(channel, fri_config, proof.fri_proof, bounds)?;
+        let mut fri_verifier =
+            FriVerifier::<MC>::commit(channel, self.config.fri_config, proof.fri_proof, bounds)?;
 
         // Verify proof of work.
-        ProofOfWork::new(PROOF_OF_WORK_BITS).verify(channel, &proof.proof_of_work)?;
+        channel.mix_u64(proof.proof_of_work);
+        if channel.trailing_zeros() < self.config.pow_bits {
+            return Err(VerificationError::ProofOfWork);
+        }
 
         // Get FRI query domains.
         let fri_query_domains = fri_verifier.column_query_positions(channel);
@@ -116,8 +116,6 @@ impl CommitmentSchemeVerifier {
             })
             .flatten();
 
-        // TODO(spapini): Properly defined column log size and dinstinguish between poly and
-        // commitment.
         let fri_answers = fri_answers(
             self.column_log_sizes().flatten().into_iter().collect(),
             &samples,

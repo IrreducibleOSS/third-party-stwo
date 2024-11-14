@@ -1,8 +1,10 @@
+use std::array;
+use std::iter::zip;
+
 use super::m31::BaseField;
 use super::qm31::SecureField;
 use super::{ExtensionOf, FieldOps};
 use crate::core::backend::{Col, Column, CpuBackend};
-use crate::core::utils::IteratorMutExt;
 
 pub const SECURE_EXTENSION_DEGREE: usize =
     <SecureField as ExtensionOf<BaseField>>::EXTENSION_DEGREE;
@@ -14,14 +16,7 @@ pub struct SecureColumnByCoords<B: FieldOps<BaseField>> {
     pub columns: [Col<B, BaseField>; SECURE_EXTENSION_DEGREE],
 }
 impl SecureColumnByCoords<CpuBackend> {
-    pub fn set(&mut self, index: usize, value: SecureField) {
-        self.columns
-            .iter_mut()
-            .map(|c| &mut c[index])
-            .assign(value.to_m31_array());
-    }
-
-    // TODO(spapini): Remove when we no longer use CircleEvaluation<SecureField>.
+    // TODO(first): Remove.
     pub fn to_vec(&self) -> Vec<SecureField> {
         (0..self.len()).map(|i| self.at(i)).collect()
     }
@@ -37,6 +32,13 @@ impl<B: FieldOps<BaseField>> SecureColumnByCoords<B> {
         }
     }
 
+    /// # Safety
+    pub unsafe fn uninitialized(len: usize) -> Self {
+        Self {
+            columns: std::array::from_fn(|_| Col::<B, BaseField>::uninitialized(len)),
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.columns[0].len()
     }
@@ -48,6 +50,14 @@ impl<B: FieldOps<BaseField>> SecureColumnByCoords<B> {
     pub fn to_cpu(&self) -> SecureColumnByCoords<CpuBackend> {
         SecureColumnByCoords {
             columns: self.columns.clone().map(|c| c.to_cpu()),
+        }
+    }
+
+    pub fn set(&mut self, index: usize, value: SecureField) {
+        let values = value.to_m31_array();
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..SECURE_EXTENSION_DEGREE {
+            self.columns[i].set(index, values[i]);
         }
     }
 }
@@ -82,13 +92,15 @@ impl<'a> IntoIterator for &'a SecureColumnByCoords<CpuBackend> {
 }
 impl FromIterator<SecureField> for SecureColumnByCoords<CpuBackend> {
     fn from_iter<I: IntoIterator<Item = SecureField>>(iter: I) -> Self {
-        let mut columns = std::array::from_fn(|_| vec![]);
-        for value in iter.into_iter() {
-            let vals = value.to_m31_array();
-            for j in 0..SECURE_EXTENSION_DEGREE {
-                columns[j].push(vals[j]);
-            }
+        let values = iter.into_iter();
+        let (lower_bound, _) = values.size_hint();
+        let mut columns = array::from_fn(|_| Vec::with_capacity(lower_bound));
+
+        for value in values {
+            let coords = value.to_m31_array();
+            zip(&mut columns, coords).for_each(|(col, coord)| col.push(coord));
         }
+
         SecureColumnByCoords { columns }
     }
 }

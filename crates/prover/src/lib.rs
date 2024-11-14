@@ -1,18 +1,24 @@
+#![allow(incomplete_features)]
 #![feature(
     array_chunks,
-    iter_array_chunks,
+    array_methods,
+    array_try_from_fn,
+    assert_matches,
     exact_size_is_empty,
-    is_sorted,
-    new_uninit,
+    generic_const_exprs,
     get_many_mut,
     int_roundings,
-    slice_flatten,
-    assert_matches,
+    is_sorted,
+    iter_array_chunks,
+    new_uninit,
     portable_simd,
-    stdarch_x86_avx512,
+    slice_first_last_chunk,
+    slice_flatten,
+    slice_group_by,
+    slice_ptr_get,
+    stdsimd
 )]
 pub mod constraint_framework;
 pub mod core;
 pub mod examples;
 pub mod math;
-pub mod trace_generation;

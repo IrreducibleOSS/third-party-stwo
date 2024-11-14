@@ -1,24 +1,33 @@
 mod accumulation;
 mod blake2s;
-mod circle;
+pub mod circle;
 mod fri;
+mod grind;
 pub mod lookups;
+#[cfg(not(target_arch = "wasm32"))]
+mod poseidon252;
 pub mod quotients;
 
 use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Backend, Column, ColumnOps, FieldOps};
+use super::{Backend, BackendForChannel, Column, ColumnOps, FieldOps};
 use crate::core::fields::Field;
 use crate::core::lookups::mle::Mle;
 use crate::core::poly::circle::{CircleEvaluation, CirclePoly};
 use crate::core::utils::bit_reverse;
+use crate::core::vcs::blake2_merkle::Blake2sMerkleChannel;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::core::vcs::poseidon252_merkle::Poseidon252MerkleChannel;
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct CpuBackend;
 
 impl Backend for CpuBackend {}
+impl BackendForChannel<Blake2sMerkleChannel> for CpuBackend {}
+#[cfg(not(target_arch = "wasm32"))]
+impl BackendForChannel<Poseidon252MerkleChannel> for CpuBackend {}
 
 impl<T: Debug + Clone + Default> ColumnOps<T> for CpuBackend {
     type Column = Vec<T>;
@@ -39,6 +48,12 @@ impl<F: Field> FieldOps<F> for CpuBackend {
 impl<T: Debug + Clone + Default> Column<T> for Vec<T> {
     fn zeros(len: usize) -> Self {
         vec![T::default(); len]
+    }
+    #[allow(clippy::uninit_vec)]
+    unsafe fn uninitialized(length: usize) -> Self {
+        let mut data = Vec::with_capacity(length);
+        data.set_len(length);
+        data
     }
     fn to_cpu(&self) -> Vec<T> {
         self.clone()

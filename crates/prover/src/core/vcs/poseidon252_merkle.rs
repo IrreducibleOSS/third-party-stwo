@@ -1,12 +1,12 @@
-use itertools::Itertools;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-use starknet_crypto::poseidon_hash_many;
+use starknet_crypto::{poseidon_hash, poseidon_hash_many};
 use starknet_ff::FieldElement as FieldElement252;
 
-use super::ops::{MerkleHasher, MerkleOps};
-use crate::core::backend::CpuBackend;
+use super::ops::MerkleHasher;
+use crate::core::channel::{MerkleChannel, Poseidon252Channel};
 use crate::core::fields::m31::BaseField;
+use crate::core::vcs::hash::Hash;
 
 const ELEMENTS_IN_BLOCK: usize = 8;
 
@@ -44,20 +44,17 @@ impl MerkleHasher for Poseidon252MerkleHasher {
     }
 }
 
-impl MerkleOps<Poseidon252MerkleHasher> for CpuBackend {
-    fn commit_on_layer(
-        log_size: u32,
-        prev_layer: Option<&Vec<FieldElement252>>,
-        columns: &[&Vec<BaseField>],
-    ) -> Vec<FieldElement252> {
-        (0..(1 << log_size))
-            .map(|i| {
-                Poseidon252MerkleHasher::hash_node(
-                    prev_layer.map(|prev_layer| (prev_layer[2 * i], prev_layer[2 * i + 1])),
-                    &columns.iter().map(|column| column[i]).collect_vec(),
-                )
-            })
-            .collect()
+impl Hash for FieldElement252 {}
+
+#[derive(Default)]
+pub struct Poseidon252MerkleChannel;
+
+impl MerkleChannel for Poseidon252MerkleChannel {
+    type C = Poseidon252Channel;
+    type H = Poseidon252MerkleHasher;
+
+    fn mix_root(channel: &mut Self::C, root: <Self::H as MerkleHasher>::Hash) {
+        channel.update_digest(poseidon_hash(channel.digest(), root));
     }
 }
 

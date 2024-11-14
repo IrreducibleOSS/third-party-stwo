@@ -9,7 +9,7 @@ use super::m31::{PackedBaseField, LOG_N_LANES, N_LANES};
 use super::qm31::PackedSecureField;
 use super::SimdBackend;
 use crate::core::backend::cpu::quotients::{batch_random_coeffs, column_line_coeffs};
-use crate::core::backend::Column;
+use crate::core::backend::{Column, CpuBackend};
 use crate::core::fields::m31::BaseField;
 use crate::core::fields::qm31::SecureField;
 use crate::core::fields::secure_column::{SecureColumnByCoords, SECURE_EXTENSION_DEGREE};
@@ -17,8 +17,7 @@ use crate::core::fields::FieldExpOps;
 use crate::core::pcs::quotients::{ColumnSampleBatch, QuotientOps};
 use crate::core::poly::circle::{CircleDomain, CircleEvaluation, PolyOps, SecureEvaluation};
 use crate::core::poly::BitReversedOrder;
-use crate::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
-use crate::core::utils::{bit_reverse, bit_reverse_index};
+use crate::core::utils::bit_reverse;
 
 pub struct QuotientConstants {
     pub line_coeffs: Vec<Vec<(SecureField, SecureField, SecureField)>>,
@@ -32,10 +31,30 @@ impl QuotientOps for SimdBackend {
         columns: &[&CircleEvaluation<Self, BaseField, BitReversedOrder>],
         random_coeff: SecureField,
         sample_batches: &[ColumnSampleBatch],
-    ) -> SecureEvaluation<Self> {
+        log_blowup_factor: u32,
+    ) -> SecureEvaluation<Self, BitReversedOrder> {
         // Split the domain into a subdomain and a shift coset.
-        // TODO(spapini): Move to the caller when Columns support slices.
-        let (subdomain, mut subdomain_shifts) = domain.split(DEFAULT_LOG_BLOWUP_FACTOR);
+        // TODO(andrew): Move to the caller when Columns support slices.
+        let (subdomain, mut subdomain_shifts) = domain.split(log_blowup_factor);
+        if subdomain.log_size() < LOG_N_LANES + 2 {
+            // Fall back to the CPU backend for small domains.
+            let columns = columns
+                .iter()
+                .map(|circle_eval| circle_eval.to_cpu())
+                .collect_vec();
+            let eval = CpuBackend::accumulate_quotients(
+                domain,
+                &columns.iter().collect_vec(),
+                random_coeff,
+                sample_batches,
+                log_blowup_factor,
+            );
+
+            return SecureEvaluation::new(
+                domain,
+                SecureColumnByCoords::from_iter(eval.values.to_vec()),
+            );
+        }
 
         // Bit reverse the shifts.
         // Since we traverse the domain in bit-reversed order, we need bit-reverse the shifts.
@@ -59,7 +78,7 @@ impl QuotientOps for SimdBackend {
         );
 
         // Extend the evaluation to the full domain.
-        // TODO(spapini): Try to optimize out all these copies.
+        // TODO(Ohad): Try to optimize out all these copies.
         for (ci, &c) in subdomain_shifts.iter().enumerate() {
             let subdomain = subdomain.shift(c);
 
@@ -74,10 +93,7 @@ impl QuotientOps for SimdBackend {
         }
         span.exit();
 
-        SecureEvaluation {
-            domain,
-            values: extended_eval,
-        }
+        SecureEvaluation::new(domain, extended_eval)
     }
 }
 
@@ -93,21 +109,20 @@ fn accumulate_quotients_on_subdomain(
     [crate::core::poly::circle::CirclePoly<SimdBackend>; 4],
 ) {
     assert!(subdomain.log_size() >= LOG_N_LANES + 2);
-    let mut values = SecureColumnByCoords::<SimdBackend>::zeros(subdomain.size());
+    let mut values =
+        unsafe { SecureColumnByCoords::<SimdBackend>::uninitialized(subdomain.size()) };
     let quotient_constants = quotient_constants(sample_batches, random_coeff, subdomain);
 
     let span = span!(Level::INFO, "Quotient accumulation").entered();
-    // TODO(spapini): bit reverse iterator.
-    for quad_row in 0..1 << (subdomain.log_size() - LOG_N_LANES - 2) {
-        // TODO(spapini): Use optimized domain iteration.
-        let spaced_ys = PackedBaseField::from_array(std::array::from_fn(|i| {
-            subdomain
-                .at(bit_reverse_index(
-                    (quad_row << (LOG_N_LANES + 2)) + (i << 2),
-                    subdomain.log_size(),
-                ))
-                .y
-        }));
+    for (quad_row, points) in CircleDomainBitRevIterator::new(subdomain)
+        .array_chunks::<4>()
+        .enumerate()
+    {
+        // TODO(andrew): Spapini said: Use optimized domain iteration. Is there a better way to do
+        // this?
+        let (y01, _) = points[0].y.deinterleave(points[1].y);
+        let (y23, _) = points[2].y.deinterleave(points[3].y);
+        let (spaced_ys, _) = y01.deinterleave(y23);
         let row_accumulator = accumulate_row_quotients(
             sample_batches,
             columns,
@@ -124,7 +139,8 @@ fn accumulate_quotients_on_subdomain(
     let span = span!(Level::INFO, "Quotient extension").entered();
 
     // Extend the evaluation to the full domain.
-    let extended_eval = SecureColumnByCoords::<SimdBackend>::zeros(domain.size());
+    let extended_eval =
+        unsafe { SecureColumnByCoords::<SimdBackend>::uninitialized(domain.size()) };
 
     let mut i = 0;
     let values = values.columns;
@@ -216,7 +232,8 @@ fn denominator_inverses(
         })
         .collect();
 
-    let mut flat_denominator_inverses = CM31Column::zeros(flat_denominators.len());
+    let mut flat_denominator_inverses =
+        unsafe { CM31Column::uninitialized(flat_denominators.len()) };
     FieldExpOps::batch_inverse(
         &flat_denominators.data,
         &mut flat_denominator_inverses.data[..],
@@ -257,12 +274,12 @@ mod tests {
     use crate::core::pcs::quotients::{ColumnSampleBatch, QuotientOps};
     use crate::core::poly::circle::{CanonicCoset, CircleEvaluation};
     use crate::core::poly::BitReversedOrder;
-    use crate::core::prover::DEFAULT_LOG_BLOWUP_FACTOR;
     use crate::qm31;
 
     #[test]
     fn test_accumulate_quotients() {
         const LOG_SIZE: u32 = 8;
+        const LOG_BLOWUP_FACTOR: u32 = 1;
         let small_domain = CanonicCoset::new(LOG_SIZE).circle_domain();
         let domain = CanonicCoset::new(LOG_SIZE + DEFAULT_LOG_BLOWUP_FACTOR).circle_domain();
         let e0: BaseColumn = (0..small_domain.size()).map(BaseField::from).collect();
@@ -285,18 +302,14 @@ mod tests {
         }];
         let cpu_columns = columns
             .iter()
-            .map(|c| {
-                CircleEvaluation::<CpuBackend, _, BitReversedOrder>::new(
-                    c.domain,
-                    c.values.to_cpu(),
-                )
-            })
-            .collect::<Vec<_>>();
+            .map(|c| CircleEvaluation::new(c.domain, c.values.to_cpu()))
+            .collect_vec();
         let cpu_result = CpuBackend::accumulate_quotients(
             domain,
             &cpu_columns.iter().collect_vec(),
             random_coeff,
             &samples,
+            LOG_BLOWUP_FACTOR,
         )
         .values
         .to_vec();
@@ -306,6 +319,7 @@ mod tests {
             &columns.iter().collect_vec(),
             random_coeff,
             &samples,
+            LOG_BLOWUP_FACTOR,
         )
         .values
         .to_vec();
