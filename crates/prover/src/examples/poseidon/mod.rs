@@ -412,6 +412,7 @@ mod tests {
     use crate::core::pcs::{CommitmentSchemeVerifier, PcsConfig, TreeVec};
     use crate::core::poly::circle::CanonicCoset;
     use crate::core::prover::verify;
+    use crate::core::tracing::init_tracing;
     use crate::core::vcs::blake2_merkle::Blake2sMerkleChannel;
     use crate::examples::poseidon::{
         apply_internal_round_matrix, apply_m4, eval_poseidon_constraints, gen_interaction_trace,
@@ -492,12 +493,14 @@ mod tests {
         });
     }
 
-    #[test_log::test]
+    #[test]
     fn test_simd_poseidon_prove() {
         // Note: To see time measurement, run test with
-        //   RUST_LOG_SPAN_EVENTS=enter,close RUST_LOG=info RUST_BACKTRACE=1 RUSTFLAGS="
+        //   RUST_BACKTRACE=1 RUSTFLAGS="
         //   -C target-cpu=native -C target-feature=+avx512f -C opt-level=3" cargo test
-        //   test_simd_poseidon_prove -- --nocapture
+        //   test_simd_poseidon_prove --features=perfetto -- --nocapture
+
+        let _guard = init_tracing().unwrap();
 
         // Get from environment variable:
         let log_n_instances = env::var("LOG_N_INSTANCES")

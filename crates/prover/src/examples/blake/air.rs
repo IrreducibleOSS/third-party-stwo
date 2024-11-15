@@ -459,17 +459,20 @@ mod tests {
     use std::env;
 
     use crate::core::pcs::PcsConfig;
+    use crate::core::tracing::init_tracing;
     use crate::core::vcs::blake2_merkle::Blake2sMerkleChannel;
     use crate::examples::blake::air::{prove_blake, verify_blake};
 
     // Note: this test is slow. Only run in release.
     #[cfg_attr(not(feature = "slow-tests"), ignore)]
-    #[test_log::test]
+    #[test]
     fn test_simd_blake_prove() {
         // Note: To see time measurement, run test with
-        //   LOG_N_INSTANCES=16 RUST_LOG_SPAN_EVENTS=enter,close RUST_LOG=info RUSTFLAGS="
+        //   LOG_N_INSTANCES=16 RUST_LOG=info RUSTFLAGS="
         //   -C target-cpu=native -C target-feature=+avx512f" cargo test --release
-        //   test_simd_blake_prove -- --nocapture --ignored
+        //   test_simd_blake_prove --features=slow-tests,perfetto -- --nocapture --ignored
+
+        let _guard = init_tracing().unwrap();
 
         // Get from environment variable:
         let log_n_instances = env::var("LOG_N_INSTANCES")
