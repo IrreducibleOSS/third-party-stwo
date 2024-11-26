@@ -14,6 +14,7 @@ use crate::core::backend::simd::utils::{InterleaveEvens, InterleaveOdds};
 use crate::core::fields::m31::{pow2147483645, BaseField, M31, P};
 use crate::core::fields::qm31::QM31;
 use crate::core::fields::FieldExpOps;
+use crate::core::tracing::trace_multiplication;
 
 pub const LOG_N_LANES: u32 = 4;
 
@@ -139,6 +140,8 @@ impl Mul for PackedM31 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self {
+        trace_multiplication!(PackedM31);
+        
         // TODO: Come up with a better approach than `cfg`ing on target_feature.
         // TODO: Ensure all these branches get tested in the CI.
         cfg_if::cfg_if! {
@@ -162,6 +165,8 @@ impl Mul<M31> for PackedM31 {
 
     #[inline(always)]
     fn mul(self, rhs: M31) -> Self::Output {
+        trace_multiplication!(PackedM31, M31);
+
         self * PackedM31::broadcast(rhs)
     }
 }
@@ -189,6 +194,8 @@ impl Mul<QM31> for PackedM31 {
 
     #[inline(always)]
     fn mul(self, rhs: QM31) -> Self::Output {
+        trace_multiplication!(PackedM31, QM31);
+
         PackedQM31::broadcast(rhs) * self
     }
 }

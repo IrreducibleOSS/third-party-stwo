@@ -8,6 +8,7 @@ use rand::distributions::{Distribution, Standard};
 use serde::{Deserialize, Serialize};
 
 use super::{ComplexConjugate, FieldExpOps};
+use crate::core::tracing::trace_multiplication;
 use crate::impl_field;
 pub const MODULUS_BITS: u32 = 31;
 pub const N_BYTES_FELT: usize = 4;
@@ -98,6 +99,8 @@ impl Mul for M31 {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
+        trace_multiplication!(PackedM31, QM31);
+
         Self::reduce((self.0 as u64) * (rhs.0 as u64))
     }
 }

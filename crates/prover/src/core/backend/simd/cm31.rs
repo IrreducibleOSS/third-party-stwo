@@ -7,6 +7,7 @@ use num_traits::{One, Zero};
 use super::m31::{PackedM31, N_LANES};
 use crate::core::fields::cm31::CM31;
 use crate::core::fields::FieldExpOps;
+use crate::core::tracing::trace_multiplication;
 
 /// SIMD implementation of [`CM31`].
 #[derive(Copy, Clone, Debug)]
@@ -86,6 +87,7 @@ impl Mul for PackedCM31 {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
+        trace_multiplication!(PackedCM31);
         // Compute using Karatsuba.
         let ac = self.a() * rhs.a();
         let bd = self.b() * rhs.b();
@@ -155,6 +157,7 @@ impl Mul<PackedM31> for PackedCM31 {
     type Output = Self;
 
     fn mul(self, rhs: PackedM31) -> Self::Output {
+        trace_multiplication!(PackedCM31, PackedM31);
         let Self([a, b]) = self;
         Self([a * rhs, b * rhs])
     }

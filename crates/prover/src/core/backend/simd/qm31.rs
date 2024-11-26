@@ -10,6 +10,7 @@ use super::cm31::PackedCM31;
 use super::m31::{PackedM31, N_LANES};
 use crate::core::fields::qm31::QM31;
 use crate::core::fields::FieldExpOps;
+use crate::core::tracing::trace_multiplication;
 
 pub type PackedSecureField = PackedQM31;
 
@@ -111,6 +112,7 @@ impl Mul for PackedQM31 {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
+        trace_multiplication!(PackedQM31);
         // Compute using Karatsuba.
         //   (a + ub) * (c + ud) =
         //   (ac + (2+i)bd) + (ad + bc)u =
@@ -184,6 +186,7 @@ impl Mul<PackedM31> for PackedQM31 {
     type Output = Self;
 
     fn mul(self, rhs: PackedM31) -> Self::Output {
+        trace_multiplication!(PackedQM31, PackedM31);
         let Self([a, b]) = self;
         Self([a * rhs, b * rhs])
     }
@@ -193,6 +196,7 @@ impl Mul<PackedCM31> for PackedQM31 {
     type Output = Self;
 
     fn mul(self, rhs: PackedCM31) -> Self::Output {
+        trace_multiplication!(PackedQM31, PackedCM31);
         let Self([a, b]) = self;
         Self([a * rhs, b * rhs])
     }
@@ -227,6 +231,7 @@ impl Mul<QM31> for PackedQM31 {
     type Output = Self;
 
     fn mul(self, rhs: QM31) -> Self::Output {
+        trace_multiplication!(PackedQM31, QM31);
         self * PackedQM31::broadcast(rhs)
     }
 }
