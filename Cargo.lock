@@ -1286,7 +1286,7 @@ dependencies = [
 [[package]]
 name = "tracing-profile"
 version = "0.8.0"
-source = "git+https://gitlab.com/IrreducibleOSS/tracing-profile.git?branch=main#6d986ca1a1b0129b6496205836522e457e75c45b"
+source = "git+https://gitlab.com/IrreducibleOSS/tracing-profile.git?rev=6d986ca1a1b0129b6496205836522e457e75c45b#6d986ca1a1b0129b6496205836522e457e75c45b"
 dependencies = [
  "nix",
  "tracing",
@@ -1297,7 +1297,7 @@ dependencies = [
 [[package]]
 name = "tracing-profile-perfetto-sys"
 version = "0.7.1"
-source = "git+https://gitlab.com/IrreducibleOSS/tracing-profile.git?branch=main#6d986ca1a1b0129b6496205836522e457e75c45b"
+source = "git+https://gitlab.com/IrreducibleOSS/tracing-profile.git?rev=6d986ca1a1b0129b6496205836522e457e75c45b#6d986ca1a1b0129b6496205836522e457e75c45b"
 dependencies = [
  "cc",
  "libc",

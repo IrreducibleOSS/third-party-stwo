@@ -17,7 +17,7 @@ thiserror = "1.0.56"
 bytemuck = "1.14.3"
 tracing = "0.1.40"
 # TODO: Use version "0.8.0" as soon as it's available
-tracing-profile = { git = "https://gitlab.com/IrreducibleOSS/tracing-profile.git", branch = "main" }
+tracing-profile = { git = "https://gitlab.com/IrreducibleOSS/tracing-profile.git", rev = "6d986ca1a1b0129b6496205836522e457e75c45b" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [profile.bench]
